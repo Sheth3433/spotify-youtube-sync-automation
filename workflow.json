@@ -1,0 +1,143 @@
+{
+  "name": "Spotify to YouTube Playlist Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "hours",
+              "hoursInterval": 6
+            }
+          ]
+        }
+      },
+      "name": "Schedule Trigger",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "resource": "library",
+        "limit": 20
+      },
+      "name": "Get Liked Songs",
+      "type": "n8n-nodes-base.spotify",
+      "typeVersion": 1,
+      "credentials": {
+        "spotifyOAuth2Api": {
+          "name": "YOUR_SPOTIFY_CONNECTION"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "batchSize": 1
+      },
+      "name": "Split Songs",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "values": {
+          "string": [
+            {
+              "name": "query",
+              "value": "={{$json[\"track\"][\"name\"]}} {{$json[\"track\"][\"artists\"][0][\"name\"]}} official audio"
+            }
+          ]
+        }
+      },
+      "name": "Create Search Query",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "url": "https://www.googleapis.com/youtube/v3/search",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "q",
+              "value": "={{$json[\"query\"]}}"
+            },
+            {
+              "name": "maxResults",
+              "value": "1"
+            },
+            {
+              "name": "type",
+              "value": "video"
+            },
+            {
+              "name": "key",
+              "value": "YOUR_YOUTUBE_API_KEY"
+            }
+          ]
+        }
+      },
+      "name": "Search YouTube",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "url": "https://www.googleapis.com/youtube/v3/playlistItems",
+        "queryParametersUi": {
+          "parameter": [
+            {
+              "name": "part",
+              "value": "snippet"
+            },
+            {
+              "name": "playlistId",
+              "value": "YOUR_PLAYLIST_ID"
+            },
+            {
+              "name": "maxResults",
+              "value": "50"
+            }
+          ]
+        }
+      },
+      "name": "Get Playlist Videos",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{$json[\"items\"][0][\"id\"][\"videoId\"]}}",
+              "operation": "isNotEmpty"
+            }
+          ]
+        }
+      },
+      "name": "Video Found?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "authentication": "genericCredentialType",
+        "genericAuthType": "oAuth2Api",
+        "requestMethod": "POST",
+        "url": "https://www.googleapis.com/youtube/v3/playlistItems?part=snippet",
+        "jsonParameters": true,
+        "bodyParametersJson": "={\n  \"snippet\": {\n    \"playlistId\": \"YOUR_PLAYLIST_ID\",\n    \"resourceId\": {\n      \"kind\": \"youtube#video\",\n      \"videoId\": \"{{$json['items'][0]['id']['videoId']}}\"\n    }\n  }\n}"
+      },
+      "name": "Add To Playlist",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 2
+    }
+  ]
+}
